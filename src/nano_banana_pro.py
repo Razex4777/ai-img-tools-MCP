@@ -226,12 +226,45 @@ async def nano_banana_pro(
                     return f"🚨 Error loading image {img_path}: {str(e)}"
         
         # Configure generation (ImageConfig.image_size supported since SDK v1.49.0)
-        config_params: Dict[str, Any] = {
-            "image_config": types.ImageConfig(
-                aspect_ratio=aspect_ratio,
-                image_size=resolution,
+        image_config_params = {"aspect_ratio": aspect_ratio}
+        resolution_warning = ""
+        
+        try:
+            # Try to create config with image_size to test support
+            types.ImageConfig(aspect_ratio=aspect_ratio, image_size=resolution)
+            image_config_params["image_size"] = resolution
+        except Exception:
+            # If validation fails (e.g. extra_forbidden), SDK doesn't support image_size yet
+            resolution_warning = f"⚠️ Warning: Resolution '{resolution}' ignored (SDK update required for 4K support)"
+        
+        # Configure safety settings to be as permissive as possible (LOW / BLOCK_NONE)
+        safety_settings = [
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
             ),
-            "response_modalities": ['IMAGE'] if output_type == "image_only" else ['TEXT', 'IMAGE']
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+        ]
+
+        config_params: Dict[str, Any] = {
+            "image_config": types.ImageConfig(**image_config_params),
+            "response_modalities": ['IMAGE'] if output_type == "image_only" else ['TEXT', 'IMAGE'],
+            "safety_settings": safety_settings
         }
         
         # Add Google Search grounding if enabled
@@ -255,6 +288,28 @@ async def nano_banana_pro(
         saved_paths = []
         temp_images = []  # Store (temp_path, final_path, wants_svg) tuples for background removal
         
+        # Validate response structure
+        if not response.parts:
+            # Check for safety blocks or other termination reasons
+            if response.candidates:
+                candidate = response.candidates[0]
+                finish_reason = candidate.finish_reason
+                
+                if finish_reason == types.FinishReason.SAFETY:
+                    # Extract detailed safety ratings
+                    safety_details = []
+                    if candidate.safety_ratings:
+                        for rating in candidate.safety_ratings:
+                            if rating.probability in [types.Probability.MEDIUM, types.Probability.HIGH]:
+                                safety_details.append(f"{rating.category.name} ({rating.probability.name})")
+                    
+                    reason_msg = f"due to safety filters: {', '.join(safety_details)}" if safety_details else "due to safety filters."
+                    return f"🚨 Error: Content generation blocked {reason_msg}\nTry refining your prompt to be more compliant with safety guidelines."
+                
+                return f"🚨 Error: Generation stopped with reason: {finish_reason.name}"
+            
+            return "🚨 Error: Empty response from Gemini API. (No parts/candidates returned)"
+
         for part in response.parts:
             # Process thinking/reasoning (if show_thinking enabled)
             if show_thinking and hasattr(part, 'thought') and part.thought:
@@ -294,6 +349,11 @@ async def nano_banana_pro(
                             actual_save_path = f"{base}.svg"
                         else:
                             actual_save_path = f"{base}.png"
+                    
+                    # Auto-create parent directory if it doesn't exist
+                    parent_dir = os.path.dirname(actual_save_path)
+                    if parent_dir and not os.path.exists(parent_dir):
+                        os.makedirs(parent_dir, exist_ok=True)
                     
                     if remove_background:
                         # Save to temporary location first for background removal
@@ -389,6 +449,11 @@ async def nano_banana_pro(
                                             break
                                     
                                     if final_path:
+                                        # Auto-create parent directory if it doesn't exist
+                                        final_parent_dir = os.path.dirname(final_path)
+                                        if final_parent_dir and not os.path.exists(final_parent_dir):
+                                            os.makedirs(final_parent_dir, exist_ok=True)
+                                        
                                         # Save to final path in requested format
                                         if wants_svg_output:
                                             _save_as_svg(transparent_img, final_path)

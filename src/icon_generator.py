@@ -258,6 +258,11 @@ async def icon_generator(
                 else:
                     output_file = f"{base_name}.svg"
                 
+                # Auto-create parent directory if it doesn't exist
+                parent_dir = os.path.dirname(output_file)
+                if parent_dir and not os.path.exists(parent_dir):
+                    os.makedirs(parent_dir, exist_ok=True)
+                
                 # Save SVG
                 with open(output_file, "w", encoding="utf-8") as f:
                     f.write(svg_content)

@@ -1,0 +1,11 @@
+"ai-image-tools": {
+    "args": [
+        "C:\\Users\\MSI-PC\\OneDrive\\Documents\\freelancing\\private\\ai-image-tools\\main.py"
+    ],
+    "command": "C:\\Users\\MSI-PC\\OneDrive\\Documents\\freelancing\\private\\ai-image-tools\\.venv\\Scripts\\python.exe",
+    "disabled": false,
+    "env": {
+        "FREEPIK_API_KEY": "xxxx",
+        "GOOGLE_API_KEY": "xxxx",
+        "PYTHONUTF8": "1"
+    }
