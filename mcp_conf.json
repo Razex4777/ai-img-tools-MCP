@@ -1,8 +1,8 @@
 "ai-image-tools": {
     "args": [
-        "C:\\Users\\MSI-PC\\OneDrive\\Documents\\freelancing\\private\\ai-image-tools\\main.py"
+        "path"
     ],
-    "command": "C:\\Users\\MSI-PC\\OneDrive\\Documents\\freelancing\\private\\ai-image-tools\\.venv\\Scripts\\python.exe",
+    "command": "python",
     "disabled": false,
     "env": {
         "FREEPIK_API_KEY": "xxxx",
